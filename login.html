@@ -176,6 +176,17 @@
             border-color: #9ca3af;
         }
 
+        #google-signin-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+        }
+
+        #google-signin-button > div {
+            width: 100% !important;
+        }
+
         .signup-link {
             text-align: center;
             margin-top: 24px;
@@ -290,7 +301,7 @@
     <script>
         // Replace with your Google OAuth Client ID from Google Cloud Console
         // Get it from: https://console.cloud.google.com/apis/credentials
-        const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE';
+        const GOOGLE_CLIENT_ID = '688021959719-9p6c7a55hjq1tr82eersqspd5rk9ml15.apps.googleusercontent.com';
 
         // Handle regular form login
         function handleLogin(event) {
@@ -306,6 +317,14 @@
             // The response.credential is a JWT ID token
             // You need to send this to your backend server for verification
             console.log('Google Sign-In successful!');
+            console.log('Response:', response);
+            
+            if (!response || !response.credential) {
+                console.error('Invalid response from Google Sign-In');
+                showMessage('error', 'Invalid response from Google. Please try again.');
+                return;
+            }
+            
             console.log('Encoded JWT ID token: ' + response.credential);
             
             // Decode the JWT token (client-side decoding for display only)
@@ -372,7 +391,13 @@
         }
 
         // Initialize Google Sign-In when the page loads
-        window.onload = function() {
+        function initGoogleSignIn() {
+            if (typeof google === 'undefined' || !google.accounts) {
+                console.error('Google Identity Services library not loaded');
+                showMessage('error', 'Google Sign-In library failed to load. Please refresh the page.');
+                return;
+            }
+
             if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
                 console.warn('Please set your Google OAuth Client ID in the GOOGLE_CLIENT_ID variable');
                 showMessage('error', 'Google Sign-In not configured. Please set your Client ID.');
@@ -387,44 +412,57 @@
                 cancel_on_tap_outside: true
             });
 
-            // Handle custom button click to trigger Google Sign-In
-            const googleButton = document.getElementById('google-signin-button');
-            googleButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                // Try to show One Tap prompt first
-                google.accounts.id.prompt((notification) => {
-                    // If One Tap is not available or dismissed, render a button
-                    if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
-                        // Create a hidden container for Google's button
-                        let tempContainer = document.getElementById('temp-google-button-container');
-                        if (!tempContainer) {
-                            tempContainer = document.createElement('div');
-                            tempContainer.id = 'temp-google-button-container';
-                            tempContainer.style.position = 'fixed';
-                            tempContainer.style.top = '50%';
-                            tempContainer.style.left = '50%';
-                            tempContainer.style.transform = 'translate(-50%, -50%)';
-                            tempContainer.style.zIndex = '10000';
-                            document.body.appendChild(tempContainer);
-                        }
-                        
-                        // Clear and render Google's button
-                        tempContainer.innerHTML = '';
-                        google.accounts.id.renderButton(tempContainer, {
-                            theme: 'outline',
-                            size: 'large',
-                            type: 'standard',
-                            text: 'signin_with',
-                            shape: 'rectangular'
-                        });
-                    }
-                });
-            });
+            // Render Google's button directly inside our custom button container
+            const googleButtonContainer = document.getElementById('google-signin-button');
+            if (googleButtonContainer) {
+                try {
+                    // Clear the container first
+                    googleButtonContainer.innerHTML = '';
+                    
+                    // Remove the social-button class to avoid styling conflicts
+                    googleButtonContainer.classList.remove('social-button');
+                    
+                    // Render Google's button
+                    google.accounts.id.renderButton(googleButtonContainer, {
+                        theme: 'outline',
+                        size: 'large',
+                        type: 'standard',
+                        text: 'signin_with',
+                        shape: 'rectangular',
+                        width: googleButtonContainer.offsetWidth || '100%',
+                        locale: 'en'
+                    });
+                    
+                    console.log('Google Sign-In button rendered successfully');
+                } catch (error) {
+                    console.error('Error rendering Google button:', error);
+                    showMessage('error', 'Failed to initialize Google Sign-In button. Please refresh the page.');
+                }
+            } else {
+                console.error('Google button container not found');
+            }
+        }
 
-            // Optional: Enable One Tap automatically on page load
-            // Uncomment the line below to show One Tap automatically
-            // google.accounts.id.prompt();
+        // Wait for Google library to load
+        window.onload = function() {
+            // Check if Google library is already loaded
+            if (typeof google !== 'undefined' && google.accounts) {
+                initGoogleSignIn();
+            } else {
+                // Wait for the library to load
+                let attempts = 0;
+                const checkGoogle = setInterval(function() {
+                    attempts++;
+                    if (typeof google !== 'undefined' && google.accounts) {
+                        clearInterval(checkGoogle);
+                        initGoogleSignIn();
+                    } else if (attempts > 50) {
+                        clearInterval(checkGoogle);
+                        console.error('Google Identity Services library failed to load after 5 seconds');
+                        showMessage('error', 'Google Sign-In library failed to load. Please check your internet connection and refresh the page.');
+                    }
+                }, 100);
+            }
         };
     </script>
 </body>
